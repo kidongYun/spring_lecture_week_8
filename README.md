@@ -561,3 +561,4 @@ public class ArticleController {
 
 ## 2주차 강의 자료
 
+https://www.youtube.com/watch?v=ZL3Ttc_b8wI
