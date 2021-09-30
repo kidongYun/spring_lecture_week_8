@@ -7,7 +7,8 @@ import lombok.Getter;
 @JsonFormat(shape = JsonFormat.Shape.OBJECT)
 public enum ApiCode {
     /* COMMON */
-    SUCCESS("CM0000", "정상입니다")
+    SUCCESS("CM0000", "정상입니다"),
+    DATA_IS_NOT_FOUND("CM0001", "데이터가 존재하지 않습니다")
     ;
 
     private final String name;
