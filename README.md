@@ -425,3 +425,7 @@ class ArticleService {
   }
 }
 ```
+
+## 3주차 강의 자료
+
+https://www.youtube.com/watch?v=AAt-DO4XGbQ
