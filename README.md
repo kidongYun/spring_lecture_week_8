@@ -1,149 +1,253 @@
-# 2주차 강의 노트
+# 3주차 강의노트
 
-## Spring 2주차 프로젝트 생성
-- https://start.spring.io/
+## 데이터 영속화 하기
 
-- Project : Gradle Project
-- Language : Java
-- Spring Boot : 2.5.4
-- Project Metadata
-    - Group : com.artineer
-    - Artifact : spring_lecture_week_2
-    - Name : spring_lecture_week_2
-    - Package name : com.artineer.spring_lecture_week_2
-    - Packaging : Jar
-    - Java : 11
+- ORM 이란?
+  - Object Relation Mapping
+  - Native Query 작성하지 않고도 영속화가 가능
+  - 벤더에 독립적이게 영속화가 가능
 
-- 웹 의존성 추가
+- H2 Database
+  - 메모리 데이터베이스로 예제 프로젝트에서 주로 사용됨
+  - console 설정을 하면 웹 기반으로 DBMS 화면도 볼 수 있음
+
+- JPA, H2 의존성 추가
 ```groovy
-	implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'com.h2database:h2'
 ```
 
-## Spring Web 진입점 만들기
-- Controller 객체 생성
+- JPA의 관리 아래에 넣기 위해 Article 도메인을 엔티티로 변경
+```java
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Entity
+public class Article {
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
+  Long id;
+  String title;
+  String content;
 
-- 간단한 ping/pong api 구현
+  public void update(String title, String content) {
+    this.title = title;
+    this.content = content;
+  }
+}
+
+```
+
+- JPA 쿼리를 사용하기 위해 Repository 객체 생성
+- CrudRepository<T, ID> 에서 T는 엔티티 객체 타입, ID는 T 타입의 ID 타입을 넣는다.
 
 ```java
-@RestController
-public class PingController {
-  @GetMapping("/")
-  public String ping() {
-    return "pong";
+public interface ArticleRepository extends CrudRepository<Article, Long> { }
+```
+
+- ArticleService 코드를 ArticleRepository 객체와 연계될 수 있도록 변경
+```java
+
+@RequiredArgsConstructor
+@Service
+public class ArticleService {
+  private final ArticleRepository articleRepository;
+
+  public Long save(Article request) {
+    return articleRepository.save(request).getId();
+  }
+
+  public Article findById(Long id) {
+    return articleRepository.findById(id).orElse(null);
+  }
+
+  @Transactional
+  public Article update(Article request) {
+    Article article = this.findById(request.getId());
+    article.update(request.getTitle(), request.getContent());
+
+    return article;
+  }
+
+  public void delete(Long id) {
+    Article article = this.findById(id);
+    articleRepository.delete(article);
   }
 }
 ```
 
-- 크롬 브라우저로 접속해서 테스트
+- Update 함수 코드를 보면 영속화의 징검다리인 Repository 클래스를 활용하지 않고 domain 클래스에 바로 접근해 업데이트 하고 있다.
+- JPA는 Persistance Context 라는 논리적 공간에서 엔티티들을 캐싱하고 관리한다.
+- JPA는 하나의 트랜잭션이 끝나게 되면 수정된 domain 내용들을 자동으로 확인하며 실제 데이터베이스 벤더에 저장한다
 
-- @GetMapping("/") 일 경우 에는 뒤 path 정보 생략이 가능하다
+
+## 트랜잭션
+
+- 원자성이 보장되어야 하는 업무 단위
+- update = 조회 + 업데이트 두개의 업무가 존재
+- 실무에서 트랜잭션을 정의하고 관리하는 것은 굉장히 중요
+
+## CRUD API 만들기
+
+- ArticleController 객체에 PUT, DELETE API 추가
 ```java
-@RestController
-public class PingController {
-  @GetMapping
-  public String ping() {
-    return "pong";
+class ArticleController {
+    // ...
+  @PutMapping("/{id}")
+  public Response<ArticleDto.Res> put(@PathVariable Long id, @RequestBody ArticleDto.ReqPut request) {
+    Article article = Article.builder()
+            .id(id)
+            .title(request.getTitle())
+            .content(request.getContent())
+            .build();
+
+    Article articleResponse = articleService.update(article);
+
+    ArticleDto.Res response = ArticleDto.Res.builder()
+            .id(String.valueOf(articleResponse.getId()))
+            .title(articleResponse.getTitle())
+            .content(articleResponse.getContent())
+            .build();
+
+    return Response.<ArticleDto.Res>builder().code(ApiCode.SUCCESS).data(response).build();
+  }
+
+  @DeleteMapping("/{id}")
+  public Response<Void> delete(@PathVariable Long id) {
+    articleService.delete(id);
+    return Response.<Void>builder().code(ApiCode.SUCCESS).build();
   }
 }
 ```
 
-## Postman 소개
-- Ping/Pong API 정상 동작하는지 확인
-- https://www.postman.com/
+## H2 Database
 
-## .http 파일 소개
-- Intellij IDE 제공해주는 HTTP 통신 클라이언트
-- 코드 기반이기 때문에 형상 관리가 가능하다
-- Ultimate 버전에서만 제공
+- 메모리 DB / 사용하기 용이해서 예제 코드 수준에서 많이 사용
+- Console 접근하기
 
---------------------------------------
+```
+// application.properties
 
-## API 구조 구현해보기
+spring.h2.console.enabled=true
+spring.h2.console.path=/h2-console
+spring.datasource.url=jdbc:h2:mem:testdb
+```
 
-- API 에는 기본적으로 응답코드와, 응답설명이 필요
-    - 응답코드는 운영되고 있는 서비스에서 오류가 발생했을 때 어떤 이슈인지 바로 확인하기 위함.
-    - API 응답이 정상적으로 내려간 것인지 혹은 아니라면 왜 오류가 났는지 등에 대한 설명을 위해 필요.
+## of pattern
+
+- 정적 팩토리 메서드 패턴이라고도 불린다.
+- 특정 객체를 생성하는 코드들이 Controller 에 상당히 중복되고 있다. 이를 개선하기 위함
+- 객체를 생성하는 일을 그 객체에 위임함으로써 보다 객체지향스러운 코딩을 할 수 있다.
 
 ```java
-@RestController
-public class PingController {
-    @GetMapping
-    public Object ping() {
-        return Map.of(
-                "code", "0000",
-                "desc", "정상입니다",
-                "data", "pong"
-        );
+class Article {
+    // ...
+  public static Article of(ArticleDto.ReqPost from) {
+    return Article.builder()
+            .title(from.getTitle())
+            .content(from.getContent())
+            .build();
+  }
+
+  public static Article of(ArticleDto.ReqPut from, Long id) {
+    return Article.builder()
+            .id(id)
+            .title(from.getTitle())
+            .content(from.getContent())
+            .build();
+  }
+}
+```
+
+```java
+class Res {
+    // ...
+    public static Res of(Article from) {
+      return Res.builder()
+              .id(String.valueOf(from.getId()))
+              .title(from.getTitle())
+              .content(from.getContent())
+              .build();
     }
 }
 ```
 
-```json
-{
-    "code": "0000",
-    "data": "pong",
-    "desc": "정상입니다"
-}
-```
-
-- 현재 Map 구조로 응답객체를 anonymous 하게 내려주는데 이 보다는 응답객체라고 명시해주는 것이 좋다.
-
 ```java
-public class Response {
-  private String code;
-  private String desc;
-  private String data;
+@Getter
+@Builder
+public class Response<T> {
+    private final ApiCode code;
+    private final T data;
 
-  public Response(String code, String desc, String data) {
-    this.code = code;
-    this.desc = desc;
-    this.data = data;
-  }
-
-  public String getCode() {
-    return code;
-  }
-
-  public void setCode(String code) {
-    this.code = code;
-  }
-
-  public String getDesc() {
-    return desc;
-  }
-
-  public void setDesc(String desc) {
-    this.desc = desc;
-  }
-
-  public String getData() {
-    return data;
-  }
-
-  public void setData(String data) {
-    this.data = data;
-  }
-}
-```
-
-```java
-@RestController
-public class PingController {
-    @GetMapping
-    public Object ping() {
-        return new Response("0000", "정상입니다", "pong");
+    public static Response<Void> ok() {
+        return Response.<Void>builder().code(ApiCode.SUCCESS).build();
+    }
+    public static <T> Response<T> ok(T data) {
+        return Response.<T>builder().code(ApiCode.SUCCESS).data(data).build();
     }
 }
 ```
 
-- API 응답구조를 만드는 코드가 항상 중복되기 때문에 이를 개선해보자
-- API code, desc 이 둘간의 결합도는 높아야 하지만 이 구조에서는 낮기 때문에 변경이 일어나면 다시 모두 맞추어야 한다. 이를 개선해보자
+```java
+class ArticleController {
+    //...
+  @PostMapping
+  public Response<Long> post(@RequestBody ArticleDto.ReqPost request) {
+    return Response.ok(articleService.save(Article.of(request)));
+  }
+
+  @GetMapping("/{id}")
+  public Response<ArticleDto.Res> get(@PathVariable Long id) {
+    return Response.ok(ArticleDto.Res.of(articleService.findById(id)));
+  }
+
+  @PutMapping("/{id}")
+  public Response<ArticleDto.Res> put(@PathVariable Long id, @RequestBody ArticleDto.ReqPut request) {
+    return Response.ok(ArticleDto.Res.of(articleService.update(Article.of(request, id))));
+  }
+
+  @DeleteMapping("/{id}")
+  public Response<Void> delete(@PathVariable Long id) {
+    articleService.delete(id);
+    return Response.ok();
+  }
+}
+```
+
+## Exception Handling
+
+- NullPointerException 이 발생할 수도 있는 영역을 찾고, null 발생했을 때에 예외를 일으켜 보자
 
 ```java
+class ArticleSertive {
+    // ...
+  @Transactional
+  public Article update(Article request) {
+    Article article = this.findById(request.getId());
+
+    if(Objects.isNull(article)) {
+      throw new RuntimeException("article value is not existed.");
+    }
+
+    article.update(request.getTitle(), request.getContent());
+
+    return article;
+  }
+}
+```
+
+- 예외를 일으킨 코드를 추가하고 실제 API 테스트를 해보니 뭔가 예외에 대한 내용이 API에 담기지는 않는다.
+- 우리가 일으킨 예외를 잡아서 핸들링하는 부분이 없기 때문에 자바 언어 수준에서 제공하는 예외 핸들링이 적용된것.
+- API 에서 예외에 대한 정보를 내려주기 위해 Controller 에서 잡아보자
+
+```java
+@Getter
 @JsonFormat(shape = JsonFormat.Shape.OBJECT)
 public enum ApiCode {
   /* COMMON */
-  SUCCESS("CM0000", "정상입니다")
+  SUCCESS("CM0000", "정상입니다"),
+  DATA_IS_NOT_FOUND("CM0001", "데이터가 존재하지 않습니다")
   ;
 
   private final String name;
@@ -153,412 +257,171 @@ public enum ApiCode {
     this.name = name;
     this.desc = desc;
   }
-
-  public String getName() {
-    return name;
-  }
-
-  public String getDesc() {
-    return desc;
-  }
 }
 ```
 
 ```java
-public class Response {
-    private ApiCode code;
-    private String data;
-
-    public Response(ApiCode code, String data) {
-        this.code = code;
-        this.data = data;
+class ArticleController {
+  //...
+  @PutMapping("/{id}")
+  public Response<Object> put(@PathVariable Long id, @RequestBody ArticleDto.ReqPut request) {
+    try {
+      return Response.ok(ArticleDto.Res.of(articleService.update(Article.of(request, id))));
+    } catch (RuntimeException e) {
+      return Response.builder().code(ApiCode.DATA_IS_NOT_FOUND).data(e.getMessage()).build();
     }
-
-    public ApiCode getCode() {
-        return code;
-    }
-
-    public void setCode(ApiCode code) {
-        this.code = code;
-    }
-
-    public String getData() {
-        return data;
-    }
-
-    public void setData(String data) {
-        this.data = data;
-    }
-}
-```
-
-```json
-{
-  "code": {
-    "name": "CM0000",
-    "desc": "정상입니다"
-  },
-  "data": "pong"
-}
-```
-
---------------------------------------------
-
-## 빌더패턴 소개
-
-```java
-class Obj {
-    Stirng param1;
-    Stirng param2;
-    Stirng param3;
-    Stirng param4;
-    Stirng param5;
-    Stirng param6;
-    
-    public Example(String param1, String param2, String param3, String param4, String param5, String param6) {
-        this.param1 = param1;
-        this.param2 = param2;
-        this.param3 = param3;
-        this.param4 = param4;
-        this.param5 = param5;
-        this.param6 = param6;
-    }
-}
-```
-
-```java
-class Process {
-  public static void main(String[] args) {
-      final Obj obj = new Obj("p1", "p2", "p3", "p4", "p5", "p6");
-      Obj obj = new Obj("p1");
-    
-    // 10000 줄의 코드
-    obj.setParam2("changed p2");
-    
-    return obj;
   }
 }
 ```
 
-- 3개의 의존성이 있을 때 생성자만을 활용한다면 총 6개의 생성자가 필요.
-    - 파라미터를 구분할 수 있는게 순서 뿐이기 때문에 어떤 파라미터인지 읽기 어렵다. 
-  
-- 그래서 SETTER 를 사용함 하지만 이는 함수형 프로그래밍 패러다임에서 좋지 않는 코드로 인지됨.
-  - 변경 가능성이 있는 구조는 읽기 어렵게 만든다.
-  
-- 변경 가능하지 않는 객체를 만드는 것이 훨씬 가독성에 좋고, 오류 찾기가 쉬워진다.
-
-- 의존성이 많다면 빌더패턴을 사용해보자
-
-- 생성자에 비해 빌더는 어떤 파라미터를 입력하는지 정확히 눈에 보임으로 더 가독성이 좋다.
-
-```java
-public class Response {
-    private ApiCode code;
-    private String data;
-
-    private Response() { }
-
-    public ApiCode getCode() {
-        return code;
-    }
-
-    public String getData() {
-        return data;
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public static class Builder {
-        private final Response response;
-
-        public Builder() {
-            this.response = new Response();
-        }
-
-        public Builder code(ApiCode code) {
-            this.response.code = code;
-            return this;
-        }
-
-        public Builder data(String data) {
-            this.response.data = data;
-            return this;
-        }
-
-        public Response build() {
-            return this.response;
-        }
-    }
-}
-```
-
-# lombok 소개
-
-- 좋은 구조를 코드를 작성하려다보니 점점 보일러플레이트 코드들이 많아지고 있다.
-
-- lombok 을 활용하면 이러한 코드들을 개선할 수 있다.
-
-```groovy
-dependencies {
-  // ...
-	compileOnly 'org.projectlombok:lombok:1.18.20'
-	annotationProcessor 'org.projectlombok:lombok:1.18.20'
-  // ...
-}
-```
+- 위 예외처리는 어떠한 오류가 발생하든 다 DATA_IS_NOT_FOUND 오류만을 반환하게 된다.
+- 오류에 대한 정보가 Controller 영역에서 Catch 할때 오류 정보를 주는 방법이 message 밖에 없기 때문에 ApiCode 부분이 고정적이다.
 
 ```java
 @Getter
-@Builder
-public class Response {
+public class ApiException extends RuntimeException {
     private final ApiCode code;
-    private final String data;
-}
-```
 
-```java
-@Getter
-@JsonFormat(shape = JsonFormat.Shape.OBJECT)
-public enum ApiCode {
-    /* COMMON */
-    SUCCESS("CM0000", "정상입니다")
-    ;
+    public ApiException(ApiCode code) {
+        this.code = code;
+    }
 
-    private final String name;
-    private final String desc;
-
-    ApiCode(String name, String desc) {
-        this.name = name;
-        this.desc = desc;
+    public ApiException(ApiCode code, String msg) {
+        super(msg);
+        this.code = code;
     }
 }
 ```
 
--------------------------------------------------------------
-
-## 동적 타입의 활용
-
-- Response 객체의 구조를 보면 data 는 항상 String 타입을 받는다. 즉 다른 타입의 데이터들은 내릴 수 없으며 항상 String 구조를 가져야 한다.
-
-- 제네릭 문법을 활용하면 이 이슈를 개선할 수 있다.
-
 ```java
-@Getter
-@Builder
-public class Response<T> {
-    private final ApiCode code;
-    private final T data;
-}
-```
-
-```java
-@RestController
-public class PingController {
-    @GetMapping
-    public Response<String> ping() {
-        return Response.<String>builder()
-                .code(ApiCode.SUCCESS)
-                .data("pong")
-                .build();
-    }
-}
-```
-
--------------------------------------------------------------
-
-## ResponseEntity 객체 활용해보기
-
-- 지금까지의 API 들은 HttpStatus Code 직접 관리할 수 없었으며 200(OK) 응답이 내려와야만 위의 API 결과물 들을 얻을 수 있다.
-
-- Http Status Code 직접 관리해야 한다면 ResponseEntity 객체를 활용할 수 있다.
-
-```java
-@RestController
-public class PingController {
-  @GetMapping
-  public ResponseEntity<Response<String>> ping() {
-    Response<String> response = Response.<String>builder()
-            .code(ApiCode.SUCCESS).data("pong").build();
-
-    return ResponseEntity
-            .status(HttpStatus.OK)
-            .body(response);
-  }
-} 
-```
-
--------------------------------------------------------------
-
-## REST API
-
-- HTTP METHOD 로 행위를 표현
-    - GET : 조회
-    - POST : 생성
-    - PUT : 변경
-    - DELETE : 제거
-
-- HTTP URI 로 리소스를 표현
-    - /users/13/posts/12 ex) 13번 유저의 12번 글
-
-- HTTP STATUS CODE, hateoas ...
-
-- REST 구조가 가지는 장점
-    - 클라를 위한 API 가 아닌 비지니스 도메인을 표현하는 API
-    - Resource / domain 중심으로 표현하는 API
-
-## Article 객체 생성
-```java
-@Getter
-@Builder
-public class Article {
-  Long id;
-  String title;
-  String content;
-}
-```
-
-## ArticleService 생성 및 save 함수 구현
-- Service 는 실제 비지니스 로직을 처리하기 위한 영역
-- 동일한 Service 기능을 다양한 controller 에서 접근이 가능하도록 구분
-
-```java
-@Service
-public class ArticleService {
-  private Long id = 0L;
-  final List<Article> database = new ArrayList<>();
-
-  public Long save(Article request) {
-    Article domain = Article.builder()
-            .id(getId())
-            .title(request.getTitle())
-            .content(request.getContent())
-            .build();
-
-    database.add(domain);
-    return domain.getId();
-  }
-
-  private Long getId() {
-    return ++id;
-  }
-}
-```
-
-## ArticleController 생성 및 ArticleService 생성자 주입
-
-- ArticleService  생성자 주입
-```java
-@RequestMapping("/api/v1/article")
-@RestController
-public class ArticleController {
-    private final ArticleService articleService;
-
-    public ArticleController(ArticleService articleService) {
-        this.articleService = articleService;
-    }
-}
-```
-
-- ArticleService 생성자 주입 lombok 을 활용해서 개선
-```java
-@RequiredArgsConstructor
-@RequestMapping("/api/v1/article")
-@RestController
-public class ArticleController {
-    private final ArticleService articleService;
-}
-```
-
-# Article DTO  (Data Transfer Object) 객체 생성
-- Domain 영역의 객체와 Presentation 영역의 객체가 구분되어야 한다.
-- ex) 기획자가 글 번호를 원화처럼 천,만,억 단위를 구분해달라고 한다 10000 -> 10,000
-
-```java
-public class ArticleDto {
-  @Getter
-  public static class ReqPost {
-    String title;
-    String content;
-  }
-}
-```
-
-## ArticleController Post 구현
-```java
-@RequiredArgsConstructor
-@RequestMapping("/api/v1/article")
-@RestController
-public class ArticleController {
-    private final ArticleService articleService;
-
-    @PostMapping
-    public Response<Long> post(@RequestBody ArticleDto.ReqPost request) {
-        Article article = Article.builder()
-                .title(request.getTitle())
-                .content(request.getContent())
-                .build();
-
-        Long id = articleService.save(article);
-
-        return Response.<Long>builder().code(ApiCode.SUCCESS).data(id).build();
-    }
-}
-```
-
-## ArticleService findById 함수 구현
-
-```java
-public class ArticleService {
+class ArticleService {
     //...
-  
-  public Article findById(Long id) {
-    return database.stream().filter(article -> article.getId().equals(id)).findFirst().get();
-  }   
-  
-    // ...
+  @Transactional
+  public Article update(Article request) {
+    Article article = this.findById(request.getId());
+
+    if (Objects.isNull(article)) {
+      throw new ApiException(ApiCode.DATA_IS_NOT_FOUND, "article value is not existed.");
+    }
+
+    article.update(request.getTitle(), request.getContent());
+
+    return article;
+  }
+  //...
 }
 ```
 
-## ArticleDto 에 Res 객체 추가
-
 ```java
-//...
-
-    @Builder
-    public static class Res {
-        private String id;
-        private String title;
-        private String content;
+class ArticleController {
+  @PutMapping("/{id}")
+  public Response<Object> put(@PathVariable Long id, @RequestBody ArticleDto.ReqPut request) {
+    try {
+      return Response.ok(ArticleDto.Res.of(articleService.update(Article.of(request, id))));
+    } catch (ApiException e) {
+      return Response.builder().code(e.getCode()).data(e.getMessage()).build();
     }
-    
-    //...
+  }
+}
 ```
 
-## ArticleController Get 구현
+- ApiException은 Api 관련된 예외처리의 목적으로 만들었기 때문에 모든 컨트롤러 영역에서 사용이 필요하다
+- 예외를 핸들링하는 try-catch 코드가 중복된다.
 
 ```java
-public class ArticleController {
-    // ...
+class ArticleController {
+    //...
+  @GetMapping("/{id}")
+  public Response<Object> get(@PathVariable Long id) {
+    try {
+      return Response.ok(ArticleDto.Res.of(articleService.findById(id)));
+    } catch (ApiException e) {
+      return Response.builder().code(e.getCode()).data(e.getMessage()).build();
+    }
+  }
+
+  @PutMapping("/{id}")
+  public Response<Object> put(@PathVariable Long id, @RequestBody ArticleDto.ReqPut request) {
+    try {
+      return Response.ok(ArticleDto.Res.of(articleService.update(Article.of(request, id))));
+    } catch (ApiException e) {
+      return Response.builder().code(e.getCode()).data(e.getMessage()).build();
+    }
+  }
+}
+```
+
+- ControllerAdvice 를 활용하면 Controller 이 후에 영역에서 공통적으로 예외처리가 가능
+
+```java
+@RestControllerAdvice
+public class ContollerExceptionHandler {
+    @ExceptionHandler(ApiException.class)
+    public Response<String> apiException(ApiException e) {
+        return Response.<String>builder().code(e.getCode()).data(e.getMessage()).build();
+    }
+}
+```
+
+```java
+class ArticleController {
+    //...
   @GetMapping("/{id}")
   public Response<ArticleDto.Res> get(@PathVariable Long id) {
-    Article article = articleService.findById(id);
+    return Response.ok(ArticleDto.Res.of(articleService.findById(id)));
+  }
 
-    ArticleDto.Res response = ArticleDto.Res.builder()
-            .id(String.valueOf(article.getId()))
-            .title(article.getTitle())
-            .content(article.getContent())
-            .build();
-
-    return Response.<ArticleDto.Res>builder().code(ApiCode.SUCCESS).data(response).build();
-  }   
-  // ...
+  @PutMapping("/{id}")
+  public Response<ArticleDto.Res> put(@PathVariable Long id, @RequestBody ArticleDto.ReqPut request) {
+    return Response.ok(ArticleDto.Res.of(articleService.update(Article.of(request, id))));
+  }
 }
 ```
----------------------------------
 
-## 2주차 강의 자료
+- Assert 객체를 만들어서 예외처리를 하면 if 문을 줄여서 보다 가독성을 높일 수 있다.
 
-https://www.youtube.com/watch?v=ZL3Ttc_b8wI
+```java
+public class Asserts {
+    public static void isNull(@Nullable Object obj, ApiCode code, String msg) {
+        if(Objects.isNull(obj)) {
+            throw new ApiException(code, msg);
+        }
+    }
+}
+```
+
+```java
+public class ArticleService {
+    //...
+  @Transactional
+  public Article update(Article request) {
+    Article article = this.findById(request.getId());
+    Asserts.isNull(article, ApiCode.DATA_IS_NOT_FOUND, "article value is not existed.");
+
+    article.update(request.getTitle(), request.getContent());
+
+    return article;
+  }
+}
+```
+
+- Optional 객체를 사용해서 예외처리를 하면 보다 가독성 높이기
+- 비용이 비쌈으로 정말 중요한 비즈니스 로직에 사용하기를 권장
+
+```java
+class ArticleService {
+    // ...
+  public Article findById(Long id) {
+    return articleRepository.findById(id)
+            .orElseThrow(() -> new ApiException(ApiCode.DATA_IS_NOT_FOUND, "article value is not existed."));
+  }
+
+  @Transactional
+  public Article update(Article request) {
+    Article article = this.findById(request.getId());
+    article.update(request.getTitle(), request.getContent());
+
+    return article;
+  }
+}
+```
