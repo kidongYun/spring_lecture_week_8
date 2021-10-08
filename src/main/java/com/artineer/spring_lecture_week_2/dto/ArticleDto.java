@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 public class ArticleDto {
     @Getter
+    @Builder
     public static class ReqPost {
         String title;
         String content;
