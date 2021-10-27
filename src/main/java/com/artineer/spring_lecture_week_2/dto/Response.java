@@ -15,6 +15,7 @@ public class Response<T> {
                 .code(ApiCode.SUCCESS)
                 .build();
     }
+
     public static <T> Response<T> ok(T data) {
         return Response.<T>builder()
                 .code(ApiCode.SUCCESS)
