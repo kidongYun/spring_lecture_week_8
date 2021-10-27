@@ -3,11 +3,11 @@ package com.artineer.spring_lecture_week_2.conroller;
 import com.artineer.spring_lecture_week_2.domain.Article;
 import com.artineer.spring_lecture_week_2.dto.ArticleDto;
 import com.artineer.spring_lecture_week_2.dto.Response;
+import com.artineer.spring_lecture_week_2.exception.ApiException;
 import com.artineer.spring_lecture_week_2.service.ArticleService;
+import com.artineer.spring_lecture_week_2.vo.ApiCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
-import javax.validation.Valid;
 
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/article")
@@ -16,7 +16,7 @@ public class ArticleController {
     private final ArticleService articleService;
 
     @PostMapping
-    public Response<Long> post(@RequestBody @Valid ArticleDto.ReqPost request) {
+    public Response<Long> post(@RequestBody ArticleDto.ReqPost request) {
         return Response.ok(articleService.save(Article.of(request)));
     }
 

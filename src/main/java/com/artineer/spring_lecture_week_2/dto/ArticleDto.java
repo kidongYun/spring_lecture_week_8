@@ -5,17 +5,12 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
-
-import javax.validation.constraints.NotBlank;
 
 public class ArticleDto {
     @Getter
     @Builder
     public static class ReqPost {
-        @NotBlank
         String title;
-        @NotBlank
         String content;
     }
 

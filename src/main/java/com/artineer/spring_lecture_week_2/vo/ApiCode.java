@@ -8,8 +8,7 @@ import lombok.Getter;
 public enum ApiCode {
     /* COMMON */
     SUCCESS("CM0000", "정상입니다"),
-    DATA_IS_NOT_FOUND("CM0001", "데이터가 존재하지 않습니다"),
-    BAD_REQUEST("CM0002", "요청 정보가 올바르지 않습니다")
+    DATA_IS_NOT_FOUND("CM0001", "데이터가 존재하지 않습니다")
     ;
 
     private final String name;
