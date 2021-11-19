@@ -1,303 +1,342 @@
-# 5주차 강의노트
+# 6주차 강의노트
 
-## Remind
+## Logging
 
-#### Q1. 의존성 주입을 할 때 사용하는 스프링 어노테이션은 ?
+- 운영되고 있는 시스템에서 로깅을 하는 행위는 과거에 통신한 데이터들의 흐름을 쫓을 수 있는 유일한 수단이기 때문에 굉장히 중요하다
+- 무분별한 로깅은 정말 필요한 정보를 보기 어렵게 만들기 때문에 필요한 것만 로깅을 하자
+- 로깅 체계를 정확히 만들어서 로깅 정보를 통해 오류의 원인을 바로 파악할 수 있도록 하는 것이 중요하다.
 
-- @Autowired
+#### 1. 가장 심플한 로깅.
 
-#### Q2. @Autowired 어노테이션이 필드에 존재하냐, 생성자에 존재하냐에 따라 필드주입, 생성자주입으로 갈린다. 스프링은 기본적으로 생성자 주입을 선호하는데 그 이유는?
-
-- 순환참조 이슈 때문에.
-
-#### Q3. 빌더 패턴이 가지는 이점?
-
-- 명시적으로 필드에 값을 주입할 수 있다.
-- Immutable 하게 코드 작성이 가능하다.
-- 필드가 많을 경우 생성자 오버로딩을 많이 하지 않고도 주입이 가능하다.
-
-#### Q4. Restful API 제공하는 기본적인 Http Method 4가지
-
-- GET : 조회
-- POST : 생성
-- PUT : 수정
-- DELETE : 제거
-
-#### Q5. DTO 객체를 생성하는 이유?
-
-- Domain Layer 의 객체와 Presentation Layer 의 객체를 구분하기 위함.
-- 두 계층 간 객체들의 역할은 분명히 다르다.
-
-#### Q6. Transaction 이란?
-
-- 특정 비즈니스에서 하나의 업무 단위라고 정의하는 것.
-- ACID
-  - Atomic (원자성) : 업무가 하나의 일련 과정이어야 한다
-  - Consistency (일관성) : 업무 결과가 작업 끝난 후에도 유지되어야 한다.
-  - Isolation (고립성) : 업무 처리 시 다른 업무가 끼어들 수 없어야 한다.
-  - Durability (영구성) : 작업 내용이 영구히 저장되어야 한다. (이건 데이터베이스 기준이기 때문에 어플리케이션 레벨에서는 달라질 수 있다.)
-
-#### Q7. 정적 팩토리 메서드 (of Pattern)
-
-- 객체 생성하는 코드를 팩토리 메서드 형태로 제공
-- 코드 중복 최소화
-- 비즈니스와 객체 생성에 대한 영역을 구분할 수 있음.
-
-#### Q8. 컨트롤러 앞단에서 예외처리 해주도록 스프링에서 제공해주는 기능 ?
-
-- @ControllerAdvice, @RestControllerAdvice
-
-#### Q9. 자바 8 이후 null 처리를 강제하기 위해서 추가된 기능 ?
-
-- Optional
-
-#### Q10. 테스트코드를 작성하는 이유
-
-- 테스트 코드는 다른 개발자들에게 하나의 문서로 사용될 수 있다.
-  - 내가 만든 함수에 대한 테스트를 명시적으로 보여줌으로써 다른 개발자들은 이 테스트 코드를 보고 내가 만든 함수가 어떻게 동작하는지를 보다 정확히 알 수 있다.
-  - 작성된 함수가 동작할 때 흔하지 않은 예외 케이스들을 접할 수 있는데 그럴때 마다 테스트 케이스를 추가해두면 이런 부분에 대해서도 추후 다른 개발자들에게 인계가 강제적으로 가능하다.
-
-- 테스트 코드가 실패했을 시 빌드 실패가 되도록 강제할 수 있어서 후 리팩토링이나 비지니스가 수정되어 소스를 수정해야 할 때 방어책이 될 수 있다.
-
-## Controller 유닛 테스트
-
-- @WebMvcTest 어노테이션은 Controller 와 관련된 객체만 스프링 컨테이너 빈으로 등록해준다.
+- 가장 많이 사용하게 될 조회 (GET) API 를 통해 간단하게 로깅하는 방법을 익혀보자.
 
 ```java
-@WebMvcTest(ArticleController.class)
-class ArticleControllerTest {
-
-}
-```
-
-- Mock 객체를 스프링 컨테이너에 등록하고 싶다면 @MockBean 어노테이션을 활용
-
-```java
-@WebMvcTest(ArticleController.class)
-class ArticleControllerTest {
-    @MockBean
-    ArticleService articleService;
-}
-```
-
-- 컨트롤러 함수들은 api 진입점으로 활용되기 때문에 가짜 api client(postman 같은) 역할을 하는 MockMvc 를 추가
-
-```java
-@WebMvcTest(ArticleController.class)
-class ArticleControllerTest {
-    @MockBean
-    ArticleService articleService;
-    @Autowired
-    MockMvc mvc;
-}
-```
-
-- MockMvc 를 활용해서 테스트 코드 구현
-
-```java
-@WebMvcTest(ArticleController.class)
-class ArticleControllerTest {
-    @MockBean
-    ArticleService articleService;
-    @Autowired
-    MockMvc mvc;
-
-    @Test
-    @DisplayName("Response.ok() 함수 호출시 code 값이 ApiCode.SUCCESS 값을 가져야 한다.")
-    public void get_whenYouCallOk_ThenReturnSuccessCode() throws Exception {
-        // given
-        Long idStub = 1L;
-        when(articleService.findById(idStub)).thenReturn(Article.builder().id(idStub).build());
-
-        // when, then
-        mvc.perform(get("/api/v1/article/" + idStub)
-                        .characterEncoding("utf-8")
-                        .accept(MediaType.APPLICATION_JSON)
-                        .contentType(MediaType.APPLICATION_JSON)
-                )
-                .andDo(print())
-                .andExpect(status().isOk());
-    }
-}
-```
-
-- Result 까지 비교해야 한다면 아래처럼 구현 가능
-
-```java
-@WebMvcTest(ArticleController.class)
-class ArticleControllerTest {
-    @MockBean
-    ArticleService articleService;
-    @Autowired
-    MockMvc mvc;
-
-    @Test
-    @DisplayName("Response.ok() 함수 호출시 code 값이 ApiCode.SUCCESS 값을 가져야 한다.")
-    public void get_whenYouCallOk_ThenReturnSuccessCode() throws Exception {
-        // given
-        Long idStub = 1L;
-        when(articleService.findById(idStub)).thenReturn(Article.builder().id(idStub).build());
-
-        // when
-        String response = mvc.perform(get("/api/v1/article/" + idStub)
-                        .characterEncoding("utf-8")
-                        .accept(MediaType.APPLICATION_JSON)
-                        .contentType(MediaType.APPLICATION_JSON)
-                )
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        // then
-        assertThat(ApiCode.SUCCESS.getName()).isSubstringOf(response);
-    }
-}
-```
-
-## 통합 테스트
-
-```java
-@SpringBootTest
-public class ArticleControllerIntegrationTest {
-
-  @Autowired
-  private WebApplicationContext context;
-
-  @Autowired
-  private ArticleRepository articleRepository;
-
-  private MockMvc mvc;
-
-  @BeforeEach
-  public void setUp() {
-    mvc = MockMvcBuilders
-            .webAppContextSetup(context)
-            .build();
-  }
-
-  @Test
-  @DisplayName("post() 실행되면 article 객체가 새로 생성되어야 한다")
-  public void post_whenItIsOccured_thenArticleShouldbeStored() throws Exception {
-    // given
-    ArticleDto.ReqPost requestBodyStub = ArticleDto.ReqPost.builder()
-            .title("title")
-            .content("content")
-            .build();
-
-    mvc.perform(post("/api/v1/article/")
-                    .characterEncoding("utf-8")
-                    .accept(MediaType.APPLICATION_JSON)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(new ObjectMapper().writeValueAsString(requestBodyStub))
-            )
-            .andDo(print())
-            .andExpect(status().isOk());
-
-    // when
-    long size = articleRepository.count();
-
-    // then
-    assertThat(size).isEqualTo(1);
-  }
-}
-```
-
-## Validation
-
-#### 직접 Validation 처리
-
-- API 앞단에서 미리 요청 데이터를 검증하고 후에 시스템에 이로 인한 문제가 없도록 한다.
-- 이해를 위해 Article 객체의 title, content 필드는 필수값이라고 하자.
-
-- Asserts 유틸 클래스를 활용해 Controller 에서 Validation 처리를 해보자.
-
-```java
-public enum ApiCode {
-    /* ... */
-    BAD_REQUEST("CM0002", "요청 정보가 올바르지 않습니다") /* 새로운 Code 추가 */
-    ;
-    
-    /* ... */
-}
-```
-
-입력 문자열이 null 이거나 __빈 공백__ 일 수 있기 때문에 이를 검증하기 위한 _isBlank_ 함수를 만든다.
-
-```java
-public class Asserts {
-    
-    /* ... */
-  
-    public static void isBlank(@Nullable String str, ApiCode code, String msg) {
-        if(Strings.isBlank(str)) {
-            throw new ApiException(code, msg);
-        }
-    }
-}
-```
-
-```java
+@Slf4j
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/article")
-@RestController
-public class ArticleController {
+@Service
+public class ArticleService {
     
-   /* ... */ 
-    
-    @PostMapping
-    public Response<Long> post(@RequestBody ArticleDto.ReqPost request) {
-      Asserts.isBlank(request.getTitle(), ApiCode.BAD_REQUEST, "'title' 은 필수 값입니다.");
-      Asserts.isBlank(request.getContent(), ApiCode.BAD_REQUEST, "'content' 는 필수 값입니다.");
-      
-      return Response.ok(articleService.save(Article.of(request)));
-    }
-    
-    /* ... */
-}
-```
+    // ...
 
-- 클라이언트에서 API 요청 해보면서 정상적으로 요청 데이터 검증이 되었는지 확인해보자.
+  public Article findById(Long id) {
+    log.info("Request : id - {}", id);
+
+    Article article = articleRepository.findById(id)
+            .orElseThrow(() -> new ApiException(ApiCode.DATA_IS_NOT_FOUND, "article is not found"));
+
+    log.info("Response : article.title - {}, article.content - {}", article.getTitle(), article.getContent());
+
+    return article;
+  }
+  
+  // ...
+}
+
+```
 
 ```http request
+### GET ARTICLE
+GET http://localhost:8080/api/v1/article/1
+
 ### POST ARTICLE
 POST http://localhost:8080/api/v1/article
 Content-Type: application/json
 
 {
-  "title" : "아티니어 스프링 강좌",
-  "content" : "아티니어 스프링 강좌 많관부!!!"
+  "title" : "title",
+  "content" : "content"
 }
 ```
 
-#### Spring Validation 으로 Validation 처리
+- 후에 WAS 서버 로그 파일에서 로그 기록들을 확인이 가능하다.
 
-- 데이터를 검증하는 케이스는 일반적으로 _Null, 빈값, 날짜의 포맷, 금액의 포맷, 요구되어지지 않은 값_ 어느정도 정형화 되어있다.
-- 스프링에서는 _spring-validation_ 이라는 의존성으로 보다 심플하게 validation 처리 할 수 있는 기능을 제공한다.
+#### 2. Proxy Pattern 을 활용한 로깅
 
-- 관련 의존성을 추가하자.
+- 위 로깅 방법은 비즈니스 영역과 로깅에 대한 영역이 공존.
+- 사실 두 기능은 분리될 수 있음.
+- 응집도를 더 높이고, 결합도를 낮출수 있다.
+- 분리가능한 기능을 한 곳에 두는 것은 두 기능의 의존성을 높이고, 결합도를 낮추는 행위.
 
-```groovy
-// build.gradle
+- 우선 ArticleService -> ArticleServiceImpl 로 이름 변경
 
-dependencies {
+```java
+public class ArticleServiceImpl {
+    // ...
+}
+```
+
+- ArticleService 인터페이스 생성
+
+```java
+public interface ArticleService {
+  Long save(Article request);
+
+  Article findById(Long id);
+
+  Article update(Article request);
+
+  void delete(Long id);
+}
+```
+
+- ArticleServiceImpl 은 ArticleService 인터페이스를 구현
+
+```java
+@Slf4j
+@RequiredArgsConstructor
+@Service
+public class ArticleServiceImpl implements ArticleService {
+  private final ArticleRepository articleRepository;
+
+  @Override
+  public Long save(Article request) {
+    return articleRepository.save(request).getId();
+  }
+
+  @Override
+  public Article findById(Long id) {
+    return articleRepository.findById(id)
+            .orElseThrow(() -> new ApiException(ApiCode.DATA_IS_NOT_FOUND, "article is not found"));
+  }
+
+  @Transactional
+  @Override
+  public Article update(Article request) {
+    Article article = this.findById(request.getId());
+    article.update(request.getTitle(), request.getContent());
+
+    return article;
+  }
+
+  @Override
+  public void delete(Long id) {
+    articleRepository.deleteById(id);
+  }
+}
+```
+
+- ArticleService 객체를 위한 프록시 객체를 생성하자
+- 프록시 객체는 원본 구현체를 감싸고 있으며 구현체를 실행시키는 역할을 한다.
+
+```java
+@RequiredArgsConstructor
+@Service
+public class ArticleServiceProxy implements ArticleService {
+    private final ArticleService articleService;
+
+    @Override
+    public Long save(Article request) {
+        return articleService.save(request);
+    }
+
+    @Override
+    public Article findById(Long id) {
+        return articleService.findById(id);
+    }
+
+    @Override
+    public Article update(Article request) {
+        return articleService.update(request);
+    }
+
+    @Override
+    public void delete(Long id) {
+        articleService.delete(id);
+    }
+}
+
+```
+
+- 구현체를 실행시키기 전, 실행시키고 난 후에 원하는 작업을 넣을 수가 있다.
+- 여기서는 로깅하는 작업을 추가했다.
+
+```java
+@Slf4j
+@RequiredArgsConstructor
+@Service
+public class ArticleServiceProxy implements ArticleService {
+  private final ArticleService articleService;
+
+  @Override
+  public Long save(Article request) {
+    return articleService.save(request);
+  }
+
+  @Override
+  public Article findById(Long id) {
+    // Pre-Process
+    log.info("Request : id - {}", id);
+
+    Article article = articleService.findById(id);
+
+    // Post-Process
+    log.info("Response : article.title - {}, article.content - {}", article.getTitle(), article.getContent());
+
+    return article;
+  }
+
+  @Override
+  public Article update(Article request) {
+    return articleService.update(request);
+  }
+
+  @Override
+  public void delete(Long id) {
+    articleService.delete(id);
+  }
+}
+```
+
+- 여기서 중요한 한가지는 클라이언트는 프록시 라는 객체를 사용하는 것을 모르며 단순히 ArticleService 라는 인터페이스만 안다는 점이다.
+- 인터페이스는 클라-서버 간 주고 받을 메시지(규격) 을 정해주며, 서로 간의 결합도를 느슨하게 해준다.
+- 즉 클라는 서버의 상세 구현 내용을 알 필요가 없고, 반대로 서버는 인터페이스 규격만 맞추어준다면 원하는 대로 개발을 진행할 수 있다.
+
+```
+ArticleServiceImpl 클릭해서 사용하고 있는 부분들을 모두 ArticleService 로 변경해주자.
+```
+
+- 실행해보면 아래와 같은 오류가 난다.
+
+```
+Parameter 0 of constructor in ...ArticleController required a single bean, but 2 were found:
+	- articleServiceImpl: defined in file ...
+	- articleServiceProxy: defined in file ...
+```
+
+- ArticleService 를 구현하는 빈이 2개인데 어떤 것을 넣어야 할지 몰라서 오류가 났다.
+- 여기서는 @Primary 어노테이션을 사용해서 해결한다.
+
+```java
+@Slf4j
+@RequiredArgsConstructor
+@Primary
+@Service
+public class ArticleServiceProxy implements ArticleService {
+    // ...
+}
+```
+
+- Controller 는 동일하게 ArticleService 객체를 참조하고 있다. (Service 를 사용하는 클라이언트 입장에서는 변화가 없다는 의미에서 중요하다)
+- Service 비즈니스 로직과 logging 과 같은 부수적인 작업은 Proxy 로 구분하였다.
+
+### 3. AOP 를 활용한 로깅
+
+- https://engkimbs.tistory.com/746
+- AOP 는 객체 중심이 아닌 기능 중심으로 서비스를 제공한다.
+- AOP 는 위에서 구현해본 Proxy Pattern 을 활용해서 구현이 되어있다.
+- AOP 는 다양한 형태로 구현될 수 있음으로 모두가 프록시 패턴으로 구현되고 있다고 오해하는 하지 말자!. 단지 느낌만 이해하자.
+
+- AOP 용어
+  - Aspect : AOP (Aspect Oriented Programming) 객체로서 사용하겠다고 명시
+  - Advice : 실제 모듈로서 동작되는 그 일 자체. 여기서는 로깅하는 업무 그 자체를 개념적으로 의미.
+  - Weaving : 프록시 객체에 원본 객체를 끼워 넣는 것.
+  - Around : 언제 Asepct 를 Weaving 시킬 것인지 그 조건을 명시
+  - JoinPoint : Advice가 적용된 위치
+
+- Around 에 조건을 어노테이션 잡아서 특정 어노테이션이 선언되어 있을 때 Aspect 가 실행되도록 구현
+
+```java
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface ExecuteLog {
+}
+```
+
+- @Target 어노테이션이 위치할 수 있는 곳을 지정한다. 여기서는 Method 위에만 지정이 가능.
+- @Retention 어노테이션은 해당 어노테이션이 어느 시점까지 메모리에 존재하게 하는지를 지정한다.
+
+```java
+@Slf4j
+@Component
+@Aspect
+public class ExecuteLogAspect {
+  @Around(value = "@annotation(ExecuteLog)")
+  public Object log(ProceedingJoinPoint joinPoint) throws Throwable {
+    // 작업 시작 시간을 구합니다.
+    long start = System.currentTimeMillis();
+
+    // 위빙된 객체의 작업을 진행합니다.
+    final Object result = joinPoint.proceed();
+
+    MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+
+    String methodName = signature.getName();
+    String input = Arrays.toString(signature.getParameterNames());
+
+    String output = result.toString();
+
+    log.info("Method Name : {}, Input : {}, Output : {}, Execute Time : {}", methodName, input, output, (System.currentTimeMillis() - start) + " ms");
+
+    return result;
+  }
+}
+```
+
+```java
+@Slf4j
+@RequiredArgsConstructor
+@Service
+public class ArticleServiceImpl implements ArticleService {
+    
+    // ...
+  
+    @ExecuteLog
+    @Override
+    public Article findById(Long id) {
+        return articleRepository.findById(id)
+                .orElseThrow(() -> new ApiException(ApiCode.DATA_IS_NOT_FOUND, "article is not found"));
+    }
+    
+    // ...
+}
+```
+
+- Proxy 안 쓰기 위해 Proxy 에 사용되어 있던 @Primary 를 Impl 로 옮기자.
+
+```java
+@Slf4j
+@RequiredArgsConstructor
+@Primary
+@Service
+public class ArticleServiceImpl implements ArticleService {
   // ...
-  
-  implementation 'org.springframework.boot:spring-boot-starter-validation'
-  
-  // ...
 }
 ```
 
-- Spring Validation 을 적용하기 위해서는 @Valid 어노테이션을 추가해야 한다.
+- 실행 결과를 확인해 보면 Output 부분이 세부적으로 나오지 않고 클래스 명과 헤쉬코드 값이 나온다.
+- toString() 을 오버라이딩 하지 않았기 때문에 자바에서 기본으로 제공되는 toString() 함수가 호출되는 것.
+- @ToString 어노테이션으로 해결 가능하다.
 
 ```java
-public class ArticleController {
-    
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
+@Entity
+public class Article {
     // ...
-  
-    @PostMapping
-    public Response<Long> post(@RequestBody @Valid ArticleDto.ReqPost request) {
-        return Response.ok(articleService.save(Article.of(request)));
+}
+```
+
+- @ToString 을 활용하는 것은 실무에서는 조금 지양된다. 무한 재귀 호출로 StackOverFlowError 가 발생할 수 있기 때문.
+
+### Optional) 4. Reflection 활용하여 어노테이션으로 정보를 가져와 보자.
+
+- AOP 같은 영역에 특정 정보들을 전달해야할 때는 어노테이션으로 전달하는 방법이 가장 무난하다.
+- 여기에서는 type 정보를 어노테이션으로 전달해서 output 을 @ToString 없이 전달 가능하게 해보자.
+
+```java
+// ...
+public class ArticleServiceImpl implements ArticleService {
+
+    // ...
+    
+    @ExecuteLog(type = Article.class)
+    @Override
+    public Article findById(Long id) {
+        return articleRepository.findById(id)
+                .orElseThrow(() -> new ApiException(ApiCode.DATA_IS_NOT_FOUND, "article is not found"));
     }
     
     // ...
@@ -305,69 +344,76 @@ public class ArticleController {
 ```
 
 ```java
-public class ArticleDto {
-    @Getter
-    @Builder
-    public static class ReqPost {
-        @NotBlank
-        String title;
-        @NotBlank
-        String content;
-    }
-    
-    // ...
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface ExecuteLog {
+    Class<?> type();
 }
 ```
-
-- title, content 에 공백 값을 넣고 테스트해보면 예외가 발생함을 알 수 있다.
-- Validation 처리가 가지는 중요한 요소 중 또 하나는 API 를 사용하는 클라이언트에게 어떤 값이 잘못되어 있는지 정보를 제공할 수 있다는 점이다.
-- 우리가 직접 작성한 Validation 코드의 경우 API 로 문제점을 전달해주고 있지만. Spring Validation 은 서버 로그에만 오류가 기록되고 Client 에는 400 에러만 내려간다.
-- Spring Validation 의 오류 내용이 API 로 적절하게 내려가도록 해주자.
-
 
 ```java
-@RestControllerAdvice
-public class ControllerExceptionHandler {
-    
-    // ...
-  
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public Response<String> methodArgumentNotValidException(MethodArgumentNotValidException e) {
-        return Response.<String>builder().code(ApiCode.BAD_REQUEST).data(e.getMessage()).build();
+@Slf4j
+@Component
+@Aspect
+public class ExecuteLogAspect {
+    @SuppressWarnings("unchecked")
+    @Around(value = "@annotation(ExecuteLog)")
+    public <T> Object log(ProceedingJoinPoint joinPoint) throws Throwable {
+        // 작업 시작 시간을 구합니다.
+        long start = System.currentTimeMillis();
+
+        // 위빙된 객체의 작업을 진행합니다.
+        final T result = (T) joinPoint.proceed();
+
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
+
+        // ExecuteLog 어노테이션에 type 값에 들어간 타입을 추론합니다.
+        Class<T> clazzType = this.classType(signature.getMethod().getAnnotations());
+
+        String methodName = signature.getName();
+        String input = Arrays.toString(signature.getParameterNames());
+
+        String output = this.toString(result);
+
+        log.info("Method Name : {}, Input : {}, Output : {}, Execute Time : {}", methodName, input, output, (System.currentTimeMillis() - start) + " ms");
+
+        return result;
+    }
+
+    private <T> String toString(T result) throws Throwable {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[");
+        for(Field field : result.getClass().getDeclaredFields()) {
+            if(Strings.isBlank(field.getName())) {
+                continue;
+            }
+
+            field.setAccessible(true);
+            sb.append(field.getName()).append("=").append(field.get(result)).append(", ");
+        }
+        sb.append("]");
+
+        return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Class<T> classType(Annotation[] annotations) throws Throwable {
+        Annotation executeLogAnnotation = Arrays.stream(annotations)
+                .filter(a -> a.annotationType().getCanonicalName().equals(ExecuteLog.class.getCanonicalName()))
+                .findFirst().orElseThrow(() -> new RuntimeException("ExecuteLog Annotation is not existed..."));
+
+        String typeMethodName = "type";
+        Method typeMethod = Arrays.stream(executeLogAnnotation.annotationType().getDeclaredMethods())
+                .filter(m -> m.getName().equals(typeMethodName))
+                .findFirst().orElseThrow(() -> new RuntimeException("type() of ExecuteLog is not existed..."));
+
+        return (Class<T>) typeMethod.invoke(executeLogAnnotation);
     }
 }
 ```
 
-- data 부분이 우리가 직접 만든 것처럼 내용이 깔끔하지는 않지만. 필요한 정보는 모두 담고 있다.
-- 원한다면 해당 문구를 파싱해서 보다 깔끔하게 내려줄수도 있다.
+- Reflection 이란 클래스 파일을 읽어서 반대로 인스턴스를 가져올 수 있는 방법
 
-#### Optional) @RequestParam, @RequestBody
+### 6주차 강의
 
-- GET 통신에서 QueryString 를 통해 받는 데이터를 Spring 은 @RequestParam 으로 받을 수 있다.
-- POST 통신에서 Body 를 통해 받는 데이터를 Spring 은 @RequestBody 으로 받을 수 있다.
-
-- @RequestBody 기반으로 들어온 데이터가 검증 실패할 경우 MethodArgumentNotValidException 오류를 던지지만 @RequestParam 은 ConstraintViolationException 오류를 던진다.
-- 이 예제에서는 @RequestParam 을 사용하지 않기 때문에 필요하지는 않지만 그래도 이를 위한 예외 처리도 적용해보도록 하자.
-
-```java
-@RestControllerAdvice
-public class ControllerExceptionHandler {
-    // ...
-  
-    /* @RequestBody 데이터 검증 실패시 발생한다. */
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public Response<String> methodArgumentNotValidException(MethodArgumentNotValidException e) {
-        return Response.<String>builder().code(ApiCode.BAD_REQUEST).data(e.getMessage()).build();
-    }
-
-    /* @RequestParam 데이터 검증 실패시 발생한다. */
-    @ExceptionHandler(ConstraintViolationException.class)
-    public Response<String> constraintViolationException(ConstraintViolationException e) {
-        return Response.<String>builder().code(ApiCode.BAD_REQUEST).data(e.getMessage()).build();
-    }
-}
-```
-
-## 5주차 강의
-
-- https://youtu.be/M1Zpk5rXqJ0
+- https://youtu.be/u4kV-0IkHds

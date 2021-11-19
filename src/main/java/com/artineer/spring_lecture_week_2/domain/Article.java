@@ -1,10 +1,7 @@
 package com.artineer.spring_lecture_week_2.domain;
 
 import com.artineer.spring_lecture_week_2.dto.ArticleDto;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
