@@ -8,4 +8,4 @@ Content-Type: application/json
 }
 
 ### GET ARTICLE
-GET http://localhost:8080/api/v1/article/1
+GET http://localhost:8080/api/v1/article/7580891219152555172
