@@ -13,7 +13,7 @@ import javax.persistence.Id;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@RedisHash
+@Entity
 public class Article {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
